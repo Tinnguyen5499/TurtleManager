@@ -154,29 +154,6 @@ bash /root/tm_setup.sh
 
 ---
 
-## 🐧 Native Install (optional / advanced)
-
-If you don’t want Docker, you can run natively on **Ubuntu 20.04** with **ROS 2 Foxy** pre‑installed at `/opt/ros/foxy` (and ROS1 if you need rosbridge).
-
-```bash
-# System deps
-sudo apt-get update
-sudo apt-get install -y tmux gnome-terminal \
-  libxcb-cursor0 libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
-
-# ROS tooling
-sudo apt-get install -y python3-colcon-common-extensions python3-rosdep
-sudo rosdep init || true
-rosdep update
-
-# Python deps
-python3 -m pip install --upgrade pip setuptools wheel sip
-python3 -m pip install --break-system-packages --ignore-installed -r requirements.txt
-
-# Run
-python3 TurtleManager.py
-```
-
 ---
 
 ## 🎯 Mapping Rules
