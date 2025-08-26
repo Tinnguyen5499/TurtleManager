@@ -1,3 +1,5 @@
+![TurtleManager GUI](docs/gui_screenshot.png)
+
 # TurtleManager 🐢
 
 A lightweight GUI to run multi‑TurtleBot experiments with **OptiTrack** on **ROS 2 Foxy** — plus a built‑in **ROS1 ↔ ROS2 rosbridge** workflow for controlling **TurtleBot2 (ROS1)** from a modern ROS 2 environment.
