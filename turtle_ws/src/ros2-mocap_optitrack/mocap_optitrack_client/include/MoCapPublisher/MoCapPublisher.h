@@ -7,6 +7,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "mocap_optitrack_interfaces/msg/rigid_body_array.hpp"
 
+#include <unordered_map>   // ← add
 
 using namespace std;
 using namespace std::chrono;
@@ -20,6 +21,8 @@ private:
 
     //Methods
     void sendFakeMessage();
+
+    std::unordered_map<int, std::string> id_to_name_;
     
 
 public:
@@ -37,7 +40,7 @@ public:
     uint16_t getServerDataPort();
     
     // Setters
-
+    void setIdToName(const std::unordered_map<int, std::string>& m) { id_to_name_ = m; }  // ← add
 };
  
 #endif

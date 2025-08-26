@@ -8,6 +8,7 @@
 #include <NatNetCAPI.h>
 #include <NatNetClient.h>
 #include <MoCapPublisher.h>
+#include <unordered_map>   // ← add
 
 
 using namespace std;
@@ -25,6 +26,8 @@ private:
     sDataDescriptions* pDataDefs;
     int g_analogSamplesPerMocapFrame = 0;
     MoCapPublisher* moCapPublisher;
+
+    std::unordered_map<int, std::string> id_to_name_;   // ← add
     //const char* server_address;
     //const char* multicast_address;
     

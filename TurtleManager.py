@@ -14,6 +14,7 @@ from GUI_setting import Ui_Dialog
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 from GUI_interface import Ui_MainWindow  # Replace this with your actual UI file if named differently
 
+
 class MonitorThread(QThread):
     status_signal = pyqtSignal(int, str)  # (TurtleBot index, "red" or "green")
 
@@ -245,41 +246,82 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
     ##################Optitrack Button Setup####################
+
+    def show_mocap_instructions(self):
+        msg = QtWidgets.QMessageBox(self)
+        msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
+        msg.setWindowTitle("OptiTrack Mapping Guide")
+        msg.setText(
+            "OptiTrack sends mocap bodies → TurtleBots.\n\n"
+            "Two mapping options:\n"
+            "1. Rename rigid bodies in Motive as 'robot_2', 'robot_3', ...\n"
+            "   → They map directly to those robots.\n\n"
+            "2. If names don't match → fallback to first-come-first-seen order\n"
+            "   (first body becomes robot_2, next robot_3, ...).\n\n"
+            "Note: Mapping always starts at robot_2 since our lab has no robot_1."
+        )
+        msg.addButton("OK", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+        msg.exec()
+
+
+
     def toggleOptiTrack(self, checked):
         """Toggle the OptiTrack setup using tmux."""
         session_name = "optitrack_session"
+        import pathlib, subprocess, os
+        TM_DIR = pathlib.Path(__file__).resolve().parent
+        TURTLE_WS = TM_DIR / "turtle_ws"
+        SETUP = TURTLE_WS / "install" / "setup.bash"
+
+        if not SETUP.exists():
+            QtWidgets.QMessageBox.warning(
+                self, "OptiTrack workspace not built",
+                "The embedded ROS 2 workspace (turtle_ws) isn’t built yet.\n"
+                "Open a terminal and run:\n\n"
+                "  source /opt/ros/foxy/setup.bash\n"
+                "  cd ~/TurtleManager/turtle_ws\n"
+                "  rosdep update && rosdep install --from-paths src --ignore-src -r -y\n"
+                "  colcon build --symlink-install"
+            )
+            return
+
+        ws = str(TURTLE_WS)  # ensure clean string paths for bash
 
         if checked:
-            print("[INFO] Starting OptiTrack...")
+            self.show_mocap_instructions()
+            print("[INFO] Starting OptiTrack…")
 
-            # Kill any existing session to avoid conflicts
-            subprocess.run(["tmux", "kill-session", "-t", session_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            # Create a new tmux session
+            # Fresh tmux session
+            subprocess.run(["tmux", "kill-session", "-t", session_name],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.run(["tmux", "new-session", "-d", "-s", session_name, "-n", "optitrack"])
 
-            # Pane 0: Launch ROS 2 OptiTrack
+            # Pane 0: Launch the OptiTrack client (from the repo's launch dir)
             launch_command = (
                 "source /opt/ros/foxy/setup.bash && "
-                "source ~/ros2_ws/install/setup.bash && "
-                "cd ~/ros2_ws/src/ros2-mocap_optitrack/launch && "
+                f"source {ws}/install/setup.bash && "
+                f"cd {ws}/src/ros2-mocap_optitrack/launch && "
                 "ros2 launch launch_z_up.py"
             )
             subprocess.run(["tmux", "send-keys", "-t", f"{session_name}:0.0", launch_command, "C-m"])
 
-            # Pane 1: Run process_mocap.py
+            # Pane 1: Run the new process_mocap node (name-based by default; change mode if you prefer)
             subprocess.run(["tmux", "split-window", "-v", "-t", f"{session_name}:0"])
             subprocess.run(["tmux", "select-layout", "-t", f"{session_name}:0", "tiled"])
 
             mocap_command = (
                 "source /opt/ros/foxy/setup.bash && "
-                "source ~/ros2_ws/install/setup.bash && "
-                "cd ~/ros2_ws/src/tb_multi_robot_control/scripts && "
-                "python3 process_mocap.py"
+                f"source {TURTLE_WS}/install/setup.bash && "
+                "ros2 run process_mocap mapper_node --ros-args "
+                "-p mode:=first_seen "
+                "-p robot_namespaces:=\"['robot_2','robot_3','robot_4','robot_5']\""
             )
+
+            # (If you want first-seen as default, change -p mode:=first_seen)
+
             subprocess.run(["tmux", "send-keys", "-t", f"{session_name}:0.1", mocap_command, "C-m"])
 
-            # Attach to the session in a new terminal
+            # Attach in GNOME Terminal
             try:
                 subprocess.Popen(["gnome-terminal", "--", "tmux", "attach-session", "-t", session_name])
             except FileNotFoundError:
@@ -288,9 +330,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 print(f"[ERROR] Failed to open gnome-terminal: {e}")
 
         else:
-            # Kill the tmux session
-            print("[INFO] Stopping OptiTrack...")
-            result = subprocess.run(["tmux", "kill-session", "-t", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            print("[INFO] Stopping OptiTrack…")
+            result = subprocess.run(["tmux", "kill-session", "-t", session_name],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if result.returncode == 0:
                 print("[INFO] OptiTrack session terminated successfully.")
             else:

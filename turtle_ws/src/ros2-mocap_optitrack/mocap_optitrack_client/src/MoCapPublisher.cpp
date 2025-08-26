@@ -105,6 +105,10 @@ void MoCapPublisher::sendRigidBodyMessage(sRigidBodyData* bodies_ptr, int nRigid
       rb.pose_stamped.header.stamp.sec = time_span_s.count();
       rb.pose_stamped.header.stamp.nanosec = time_span_ns.count();
       //
+      // Name from ID→name map (may be empty if Motive had no name)
+      auto it = id_to_name_.find(bodies[i].ID);
+      rb.name = (it != id_to_name_.end()) ? it->second : std::string();
+      
       // Add the current rigid body to the array of rigid bodies
       msg.rigid_bodies.push_back(rb);
   }

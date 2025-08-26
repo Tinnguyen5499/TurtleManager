@@ -345,6 +345,10 @@ void MoCapNatNetClient::getDataDescription()
 	{
         //Print the data description
         processDataDescription(this->pDataDefs);
+        // ↓↓↓ ADD THIS ↓↓↓
+        // Give the publisher the ID→name table we just built
+        this->moCapPublisher->setIdToName(id_to_name_);
+        // ↑↑↑ ADD THIS ↑↑↑
     }
 }
 
@@ -405,6 +409,14 @@ void MoCapNatNetClient::processRigidBody(sRigidBodyDescription* pRB)
     RCLCPP_INFO(this->moCapPublisher->get_logger(), "RigidBody ID : %d\n", pRB->ID);
     RCLCPP_INFO(this->moCapPublisher->get_logger(), "RigidBody Parent ID : %d\n", pRB->parentID);
     RCLCPP_INFO(this->moCapPublisher->get_logger(), "Parent Offset : %3.2f,%3.2f,%3.2f\n", pRB->offsetx, pRB->offsety, pRB->offsetz);
+    
+    // ↓↓↓ ADD THIS ↓↓↓
+    if (pRB && pRB->szName) {
+        id_to_name_[pRB->ID] = pRB->szName;
+    } else {
+        id_to_name_[pRB->ID] = "";
+    }
+    // ↑↑↑ ADD THIS ↑↑↑
 
     if ( pRB->MarkerPositions != NULL && pRB->MarkerRequiredLabels != NULL )
     {
@@ -423,6 +435,8 @@ void MoCapNatNetClient::processRigidBody(sRigidBodyDescription* pRB)
         }
     }
 }
+
+
 
 // Method that processes a Skeleton descriptor
 void MoCapNatNetClient::processSkeleton(sSkeletonDescription* pSK)

@@ -7,3 +7,4 @@ bool valid
 float64 mean_error
 #Pose of the body
 geometry_msgs/PoseStamped pose_stamped
+string name
