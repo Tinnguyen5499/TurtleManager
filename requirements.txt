@@ -1,4 +1,6 @@
-PyQt6>=6.4
+# Python deps for TurtleManager GUI + helpers
+PyQt6>=6.7.0
 psutil>=5.9
 numpy>=1.22
 rowan>=1.3
+paramiko>=3.4

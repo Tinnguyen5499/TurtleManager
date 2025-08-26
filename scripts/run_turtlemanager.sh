@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
+cd "$(dirname "$0")/.."
 
-_here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$_here/.." && pwd)"
-WS_DIR="$REPO_DIR/turtle_ws"
+export QT_QPA_PLATFORM=xcb
 
-# Source ROS Foxy and the embedded workspace for THIS process only.
-source /opt/ros/foxy/setup.bash
-source "$WS_DIR/install/setup.bash"
+if [[ -z "${DISPLAY:-}" ]]; then
+  echo "WARNING: \$DISPLAY is empty. If you're on SSH, reconnect with: ssh -Y user@host"
+  echo "You can also test headless with: xvfb-run -a python3 -c 'from PyQt6 import QtWidgets; print(\"OK\")'"
+fi
 
-cd "$REPO_DIR"
-exec python3 TurtleManager.py
+python3 TurtleManager.py
