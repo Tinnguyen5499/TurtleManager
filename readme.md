@@ -1,6 +1,5 @@
 <p align="center">
-  <img src="docs/gui_main.png" alt="Main GUI" width="45%"/>
-  <img src="docs/gui_settings.png" alt="Settings GUI" width="45%"/>
+  <img src="docs/gui_main.png" alt="Main GUI" width="80%"/>
 </p>
 
 
