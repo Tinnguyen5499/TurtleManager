@@ -67,22 +67,84 @@ docker run -it --privileged \
 ### Block 2 — inside the container
 
 ```bash
-# 1) Grab the repo
-git clone https://github.com/Tinnguyen5499/TurtleManager
-cd TurtleManager
+# --- TurtleManager one-shot setup & run (Ubuntu 20.04 / ROS2 Foxy ) ---
+set -Eeuo pipefail
+export DEBIAN_FRONTEND=noninteractive
+export QT_QPA_PLATFORM=xcb
 
-# 2) Install Python deps (no venv needed)
-python3 -m pip install --upgrade pip setuptools wheel sip
-python3 -m pip install --break-system-packages --ignore-installed -r requirements.txt
+cat >/root/tm_setup.sh <<'SH'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+export DEBIAN_FRONTEND=noninteractive
+export QT_QPA_PLATFORM=xcb
 
-# 3) Run the GUI
-python3 TurtleManager.py
+log(){ echo -e "\n>>> $*\n"; }
 
-# (Optional) View tmux logs at any time
-# tmux attach -t optitrack_session
-```
+retry() {
+  local n=0 max=5 delay=3
+  until "$@"; do
+    n=$((n+1))
+    if [ "$n" -ge "$max" ]; then echo "Command failed after $n attempts: $*"; break; fi
+    echo "Retry $n/$max for: $*"; sleep "$delay"
+  done
+}
 
-The GUI will handle sourcing ROS, and on first run it will build the embedded `turtle_ws/` if needed.
+log "1) System packages (Qt/X11 libs, terminal, tools)"
+retry apt-get update -y
+apt-get install -y \
+  python3 python3-pip python3-dev build-essential git tmux sshpass gnome-terminal \
+  libx11-xcb1 libxcb1 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+  libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xfixes0 \
+  libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 \
+  libgl1 libglu1-mesa libsm6 libxext6 libglib2.0-0 qtwayland5 \
+  python3-colcon-common-extensions python3-rosdep || true
+
+log "2) Upgrade pip tooling"
+python3 -m pip install -U pip setuptools wheel sip packaging || true
+
+log "3) Install PyQt6 first (prevents resolver weirdness)"
+python3 -m pip install --no-cache-dir "PyQt6>=6.7,<6.8" || \
+python3 -m pip install --no-cache-dir "PyQt6>=6.5" || true
+
+log "4) Clone/Update TurtleManager"
+cd /root
+if [ -d TurtleManager/.git ]; then
+  git -C TurtleManager pull --ff-only || true
+else
+  git clone https://github.com/Tinnguyen5499/TurtleManager || true
+fi
+cd /root/TurtleManager
+
+log "5) Install Python deps"
+python3 -m pip install --no-cache-dir --ignore-installed -r requirements.txt || true
+
+log "6) Build embedded ROS2 workspace (turtle_ws) if Foxy exists"
+if [ -f /opt/ros/foxy/setup.bash ]; then
+  # Temporarily disable nounset to avoid 'AMENT_TRACE_SETUP_FILES: unbound variable'
+  set +u
+  source /opt/ros/foxy/setup.bash
+  set -u
+
+  cd /root/TurtleManager/turtle_ws
+  rosdep init 2>/dev/null || true
+  rosdep update || true
+  rosdep install --from-paths src --ignore-src -r -y || true
+  colcon build --symlink-install || true
+  cd /root/TurtleManager
+else
+  echo "NOTE: /opt/ros/foxy not found, skipping turtle_ws build."
+fi
+
+log "7) Launch TurtleManager GUI"
+if [ -z "${DISPLAY:-}" ]; then
+  echo 'WARNING: $DISPLAY is empty. On the HOST run:  xhost +local:root'
+fi
+python3 TurtleManager.py || true
+SH
+
+chmod +x /root/tm_setup.sh
+bash /root/tm_setup.sh
+# --- end ---
 
 ---
 
