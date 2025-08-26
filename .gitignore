@@ -1,0 +1,19 @@
+# python
+__pycache__/
+*.pyc
+
+# top-level build artifacts
+/build/
+/install/
+/log/
+/.venv/
+
+# workspace artifacts
+/turtle_ws/build/
+/turtle_ws/install/
+/turtle_ws/log/
+
+# VSCode etc.
+.vscode/
+.idea/
+*.swp

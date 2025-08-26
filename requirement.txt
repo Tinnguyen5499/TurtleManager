@@ -1,0 +1,4 @@
+PyQt6>=6.4
+psutil>=5.9
+numpy>=1.22
+rowan>=1.3
