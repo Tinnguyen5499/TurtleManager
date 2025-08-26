@@ -311,12 +311,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             mocap_command = (
                 "source /opt/ros/foxy/setup.bash && "
-                f"source {TURTLE_WS}/install/setup.bash && "
-                "ros2 run process_mocap mapper_node --ros-args "
-                "-p mode:=first_seen "
-                "-p robot_namespaces:=\"['robot_2','robot_3','robot_4','robot_5']\""
+                f"source {ws}/install/setup.bash && "
+                "ros2 run process_mocap process_mocap "
+                "--ros-args "
+                "-p mode:=name "
+                "-p robot_namespaces:='[robot_2, robot_3, robot_4, robot_5]'"
             )
-
             # (If you want first-seen as default, change -p mode:=first_seen)
 
             subprocess.run(["tmux", "send-keys", "-t", f"{session_name}:0.1", mocap_command, "C-m"])
