@@ -55,7 +55,9 @@ xhost +local:root
 
 # Get the Dockerfile and build the image (no repo checkout needed yet)
 curl -fsSL https://raw.githubusercontent.com/Tinnguyen5499/TurtleManager/main/Dockerfile -o Dockerfile
-docker build -t turtlemanager .
+# NOTE: Use DOCKER_BUILDKIT=0 to avoid BuildKit hanging during
+# the large catkin_make layer export. The legacy builder handles it reliably.
+DOCKER_BUILDKIT=0 docker build -t turtlemanager .
 
 # Run the container with display + host networking
 docker run -it --privileged \

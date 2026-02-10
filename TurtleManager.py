@@ -14,6 +14,13 @@ from GUI_setting import Ui_Dialog
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 from GUI_interface import Ui_MainWindow  # Replace this with your actual UI file if named differently
 
+# Fix FastRTPS std::bad_alloc crash in Docker with --network=host:
+# 1) Restrict DDS discovery to localhost (prevents multicast on all host interfaces)
+# 2) Clean stale shared memory left by previous crashed ROS 2 processes
+os.environ["ROS_LOCALHOST_ONLY"] = "1"
+subprocess.run("rm -f /dev/shm/fastrtps_* /dev/shm/sem.fastrtps_*",
+               shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 
 class MonitorThread(QThread):
     status_signal = pyqtSignal(int, str)  # (TurtleBot index, "red" or "green")
@@ -298,6 +305,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             # Pane 0: Launch the OptiTrack client (from the repo's launch dir)
             launch_command = (
+                "export ROS_LOCALHOST_ONLY=1 && "
                 "source /opt/ros/foxy/setup.bash && "
                 f"source {ws}/install/setup.bash && "
                 f"cd {ws}/src/ros2-mocap_optitrack/launch && "
@@ -310,6 +318,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             subprocess.run(["tmux", "select-layout", "-t", f"{session_name}:0", "tiled"])
 
             mocap_command = (
+                "export ROS_LOCALHOST_ONLY=1 && "
                 "source /opt/ros/foxy/setup.bash && "
                 f"source {ws}/install/setup.bash && "
                 "ros2 run process_mocap process_mocap "
@@ -718,7 +727,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         try:
             found = False
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                if process_name in " ".join(proc.info['cmdline']):
+                cmdline = proc.info.get('cmdline')
+                if cmdline and process_name in " ".join(cmdline):
                     proc.terminate()
                     proc.wait()
                     print(f"Process '{process_name}' with PID {proc.info['pid']} terminated.")
@@ -1099,6 +1109,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """Toggle the roscore process."""
         if checked:
             ros_master_uri, host_ip = self.export_environment()
+            # Clean stale FastRTPS shared memory to prevent std::bad_alloc
+            subprocess.run("rm -f /dev/shm/fastrtps_* /dev/shm/sem.fastrtps_*", shell=True)
             command = (
                 f"export ROS_MASTER_URI={ros_master_uri} && "
                 f"export ROS_IP={host_ip} && "
@@ -1117,9 +1129,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         """Toggle the rosbridge process."""
         if checked:
             ros_master_uri, host_ip = self.export_environment()
+            # Clean stale FastRTPS shared memory to prevent std::bad_alloc
+            subprocess.run("rm -f /dev/shm/fastrtps_* /dev/shm/sem.fastrtps_*", shell=True)
             command = (
                 f"export ROS_MASTER_URI={ros_master_uri} && "
                 f"export ROS_IP={host_ip} && "
+                "export ROS_LOCALHOST_ONLY=1 && "
                 "source /opt/ros/noetic/setup.bash && "
                 "source /opt/ros/foxy/setup.bash && "
                 "ros2 run ros1_bridge dynamic_bridge --bridge-all-topics"
@@ -1140,7 +1155,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         if checked:
             try:
                 # Start Rviz2 in a new terminal
-                command = "bash -c 'source /opt/ros/foxy/setup.bash && rviz2'"
+                command = "bash -c 'export ROS_LOCALHOST_ONLY=1 && source /opt/ros/foxy/setup.bash && rviz2'"
                 print(f"Starting Rviz2 with command: {command}")
                 subprocess.Popen(
                     ["gnome-terminal", "--", "bash", "-c", command],
@@ -1185,6 +1200,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             try:
                 # Start Gazebo in a new terminal
                 command = (
+                    "export ROS_LOCALHOST_ONLY=1 && "
                     "source /opt/ros/foxy/setup.bash && "
                     "export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:/usr/share/gazebo-11/models:/opt/ros/foxy/share/turtlebot3_gazebo/models && "
                     "export TURTLEBOT3_MODEL=burger && "
