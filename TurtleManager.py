@@ -116,7 +116,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.password = "pw"
         # Track selected mode: "run", "scripts", or "launch"
-        self.current_mode = "run"
+        # DEPRECATED: self.current_mode = "run" -> Now effectively always generic
+        self.current_mode = "generic"
 
         # Renaming buttons for ease of use
         self.selectAllButton = self.pushButton
@@ -146,6 +147,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.gazeboCheckBox = self.checkBox_11  # New checkbox for Gazebo
         self.gazebo_process = None  # Process variable for Gazebo
         self.startButton=self.pushButton_9
+
+        # --- NEW: Browse Button ---
+        self.browseButton = QtWidgets.QPushButton("Browse Folder")
+        self.browseButton.clicked.connect(self.browseFolder)
+        # Add it to the layout where packageComboBox is
+        self.verticalLayout_3.insertWidget(2, self.browseButton) # Index 2 is after comboBox
+
 
 
         self.restartAllButton = self.pushButton_2
@@ -343,34 +351,44 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
         # Connect radio buttons
-        self.radioButton_7.toggled.connect(lambda checked: self.switch_mode("run", checked))
-        self.radioButton_8.toggled.connect(lambda checked: self.switch_mode("scripts", checked))
-        self.radioButton_9.toggled.connect(lambda checked: self.switch_mode("launch", checked))
+        # The user wants to treat all folders generically, so we hide these
+        # self.radioButton_7.setVisible(False)
+        # self.radioButton_8.setVisible(False)
+        # self.radioButton_9.setVisible(False)
+        
+        # Change "ROS2 Packages" label to "Folder"
+        # self.label.setText("Folder")
+        
+        # Add "Scripts" label in place of radio buttons
+        # self.scriptsLabel = QtWidgets.QLabel("Scripts")
+        # self.scriptsLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Add to the layout where radio buttons were (horizontalLayout_2)
+        # self.horizontalLayout_2.addWidget(self.scriptsLabel)
+
+
 
     def switch_mode(self, mode, checked):
-        if checked:
-            self.current_mode = mode
-            print(f"Switched to mode: {self.current_mode}")
-            self.updateScripts(self.packageComboBox.currentText())
+        # Modes are deprecated, this function is kept to prevent crashes if signals fire
+        pass
+
+    def browseFolder(self):
+        """Open a dialog to select a folder and add it to the package list."""
+        folder = QtWidgets.QFileDialog.getExistingDirectory(self, "Select Folder")
+        if folder:
+            package_name = os.path.basename(folder)
+            # Add to packages dict
+            self.packages[package_name] = folder
+            # Add to combobox and select it
+            self.packageComboBox.addItem(package_name)
+            self.packageComboBox.setCurrentText(package_name)
+
 
         ##################################################################
 
     def getTargetFolder(self, package_name):
-        """Determine the target folder based on the current mode."""
-        package_folder = self.packages[package_name]
-
-        if self.current_mode == "scripts":
-            target_folder = os.path.join(package_folder, "scripts")
-        elif self.current_mode == "launch":
-            target_folder = os.path.join(package_folder, "launch")
-        else:  # "run" mode assumes scripts are directly in the nested package folder
-            target_folder = os.path.join(package_folder, package_name)
-
-        # Ensure the target folder exists
-        if not os.path.exists(target_folder):
-            os.makedirs(target_folder, exist_ok=True)
-
-        return target_folder    
+        """Determine the target folder."""
+        # Simplified: Just return the package folder directly
+        return self.packages[package_name]    
 
     
 
@@ -746,7 +764,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         packages = {}
         src_path = os.path.join(self.workspace_path, "src")
         if not os.path.exists(src_path):
-            QtWidgets.QMessageBox.critical(self, "Error", f"Source directory not found: {src_path}")
+            # Silently return empty if not found, as per user request
+            # QtWidgets.QMessageBox.critical(self, "Error", f"Source directory not found: {src_path}")
             return packages
 
         # Recursively walk through all directories in src
@@ -764,7 +783,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 print(f"Discovered packages: {list(self.packages.keys())}")  # Debug log
                 self.packageComboBox.addItems(self.packages.keys())
             else:
-                QtWidgets.QMessageBox.warning(self, "Warning", "No ROS 2 packages found in the src directory.")
+                # Silently ignore if no packages found
+                # QtWidgets.QMessageBox.warning(self, "Warning", "No ROS 2 packages found in the src directory.")
+                pass
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Error", f"Failed to load ROS 2 packages: {e}")
 
@@ -774,33 +795,24 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             return
 
         try:
-            package_folder = self.packages[package_name]
-
-            if self.current_mode == "run":
-                nested_folder = os.path.join(package_folder, package_name)
+            target_folder = self.getTargetFolder(package_name)
+            
+            # Simplified: List all .py files in the target folder
+            if os.path.exists(target_folder):
                 scripts = [
-                    file for file in os.listdir(nested_folder)
-                    if file.endswith(".py") and file != "__init__.py" and os.path.isfile(os.path.join(nested_folder, file))
+                    file for file in os.listdir(target_folder)
+                    if file.endswith(".py") and file != "__init__.py" and os.path.isfile(os.path.join(target_folder, file))
                 ]
-            elif self.current_mode == "scripts":
-                scripts_folder = os.path.join(package_folder, "scripts")
-                scripts = [
-                    file for file in os.listdir(scripts_folder)
-                    if file.endswith(".py") and os.path.isfile(os.path.join(scripts_folder, file))
-                ]
-            elif self.current_mode == "launch":
-                launch_folder = os.path.join(package_folder, "launch")
-                scripts = [
-                    file for file in os.listdir(launch_folder)
-                    if file.endswith(".py") and os.path.isfile(os.path.join(launch_folder, file))
-                ]
-
-            if scripts:
-                self.scriptComboBox.addItems(scripts)
+                
+                if scripts:
+                    self.scriptComboBox.addItems(scripts)
+                else:
+                    self.scriptComboBox.addItem("No scripts found")
             else:
-                QtWidgets.QMessageBox.warning(self, "Warning", f"No scripts found for {package_name} in {self.current_mode} mode.")
+                 self.scriptComboBox.addItem("Folder not found")
+
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Error", f"Failed to load scripts for {package_name}: {e}")
+            print(f"[ERROR] Error updating scripts: {e}")
 
     def isGeditAvailable(self):
         """Check if gedit is installed and available."""
@@ -851,10 +863,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             # Open the script in gedit
             os.system(f"gedit {script_path} &")
 
-            if self.current_mode == "run":
-                # Only add entry points if in "run" mode
-                self.addToEntryPoint(package_name, script_name)
-
+            # Entry point addition removed as requested
+            
             QtWidgets.QMessageBox.information(self, "Success", f"Script {script_name} created successfully.")
             self.updateScripts(package_name)
 
@@ -1007,93 +1017,31 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             QtWidgets.QMessageBox.critical(self, "Error", f"Failed to update setup.py: {e}")
 
     def runSelectedScript(self):
-        """Run the selected script using the mode selected (ros2 run, scripts folder, or launch)."""
-        package_name = self.packageComboBox.currentText()
+        """Run the selected script."""
         script_name = self.scriptComboBox.currentText()
+        package_name = self.packageComboBox.currentText()
 
-        if not package_name or package_name not in self.packages:
-            QtWidgets.QMessageBox.warning(self, "Warning", "Please select a valid package.")
-            return
-        if not script_name:
-            QtWidgets.QMessageBox.warning(self, "Warning", "Please select a valid script to run.")
+        if not script_name or script_name == "No scripts found":
+            QtWidgets.QMessageBox.warning(self, "Warning", "Please select a valid script.")
             return
 
-        # Remove the ".py" extension to match the entry point in setup.py when in "run" mode
-        executable_name = os.path.splitext(script_name)[0]
+        target_folder = self.getTargetFolder(package_name)
+        script_path = os.path.join(target_folder, script_name)
+        
+        # Sourcing ROS2 before running the script
+        # matches user request: "wait when I click run they should source ros2 like I did before"
+        
+        setup_cmds = f"source /opt/ros/foxy/setup.bash"
+        if os.path.exists(os.path.join(self.workspace_path, "install/setup.bash")):
+             setup_cmds += f" && source {self.workspace_path}/install/setup.bash"
+        
+        # Wrapped command
+        command = f"{setup_cmds} && python3 {script_path}; exec bash"
+        
+        # We need to run this in a terminal so the user can see output/interact
+        self.run_command_in_terminal(command)
 
-        try:
-            if self.current_mode == "run":
-                # Build the package
-                build_command = f"colcon build --packages-select {package_name}"
-                print(f"Building package: {package_name}")
-                build_result = subprocess.run(
-                    ["bash", "-c", build_command],
-                    cwd=self.workspace_path,
-                    capture_output=True,
-                    text=True,
-                )
 
-                if build_result.returncode != 0:
-                    print(f"Build failed: {build_result.stderr}")
-                    QtWidgets.QMessageBox.critical(
-                        self,
-                        "Build Error",
-                        f"Failed to build the package '{package_name}'.\n\nError:\n{build_result.stderr}",
-                    )
-                    return
-                else:
-                    print(f"Package '{package_name}' built successfully.")
-
-                # Source the workspace after the build
-                source_command = f"source /opt/ros/foxy/setup.bash && source {self.workspace_path}/install/setup.bash"
-
-                # Construct the ros2 run command
-                run_command = f"{source_command} && ros2 run {package_name} {executable_name}"
-
-            elif self.current_mode == "scripts":
-                # Run the selected script directly
-                script_path = os.path.join(self.packages[package_name], "scripts", script_name)
-                run_command = f"source /opt/ros/foxy/setup.bash && source {self.workspace_path}/install/setup.bash && python3 {script_path}"
-
-            elif self.current_mode == "launch":
-                # Run the launch file
-                launch_file = os.path.join(self.packages[package_name], "launch", script_name)
-                run_command = f"source /opt/ros/foxy/setup.bash && ros2 launch {package_name} {script_name}"
-
-            print(f"Running command using tmux: {run_command}")
-
-            # Use tmux to run the command
-            session_name = f"script_{executable_name}_session"
-
-            # Check if tmux session already exists
-            result = subprocess.run(["tmux", "has-session", "-t", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if result.returncode == 0:
-                # Kill session if it already exists to avoid conflicts
-                subprocess.run(["tmux", "kill-session", "-t", session_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            # Create a new tmux session and run the command
-            subprocess.run(["tmux", "new-session", "-d", "-s", session_name, "bash"])
-            subprocess.run(["tmux", "send-keys", "-t", session_name, run_command, "C-m"])
-
-            # Attach to the session in a new terminal window
-            try:
-                subprocess.Popen(["gnome-terminal", "--", "tmux", "attach-session", "-t", session_name])
-                QtWidgets.QMessageBox.information(self, "Script Started", f"Script '{script_name}' has been started using tmux.")
-            except FileNotFoundError:
-                QtWidgets.QMessageBox.critical(
-                    None,
-                    "Error",
-                    (
-                        "The terminal emulator 'gnome-terminal' is not installed.\n\n"
-                        "Please install it by running the following command in your terminal:\n\n"
-                        "sudo apt-get install gnome-terminal"
-                    ),
-                )
-            except Exception as e:
-                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to start the terminal: {e}")
-
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Error", f"Failed to run the script: {e}")
 
     def toggleRoscore(self, checked):
         """Toggle the roscore process."""
